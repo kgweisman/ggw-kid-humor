@@ -14,6 +14,7 @@ library(lme4)
 # library(smacof)
 # library(eba)
 library(langcog)
+library(arm)
 
 # clear environment
 rm(list=ls())
@@ -490,7 +491,7 @@ d1 = dd %>%
                                              ifelse(pairCat == "human.animal", 1,
                                                     0)))))
 
-# --- MAKE PROPORTIONS DATAFRAME ----------------------------------------------
+# --- MAKE PROPORTIONS DATAFRAMES ---------------------------------------------
 
 # by participant, by predicate
 
@@ -657,24 +658,17 @@ qplot(x = pairCat, y = mean, data = twoWayBoot, geom = "bar", stat = "identity")
   facet_wrap(predicate ~ humorType) + 
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
 
-# --- MODELS ------------------------------------------------------------------
+# ... by predicate and trialNum
+# ... silliness
+qplot(x = trialNum, y = silliness, data = d1, geom = "point", position = "jitter") + 
+  facet_wrap(~ predicate) + 
+  geom_smooth()
+# ... sarcasm
+qplot(x = trialNum, y = sarcasm, data = d1, geom = "point", position = "jitter") + 
+  facet_wrap(~ predicate) + 
+  geom_smooth()
 
-# silliness
-
-# ... by predicate, age
-silliness0 <- glmer(sillinessCat ~ predicate + (1 | subid), data = d1, family = "binomial")
-summary(silliness0)
-
-silliness1 <- glmer(sillinessCat ~ predicate + ageCalc + (1 | subid), data = d1, family = "binomial")
-summary(silliness1)
-
-# silliness2 <- glmer(sillinessCat ~ predicate * ageCalc + (1 | subid), data = d1, family = "binomial")
-# summary(silliness2) # failed to converge
-
-# anova(silliness0, silliness1, silliness2)
-anova(silliness0, silliness1)
-
-# ... by predicate, pairCat
+# --- CONTRASTS ---------------------------------------------------------------
 
 contrasts(d1$pairCat) <- cbind(between.within = c(0,0,0,1,1,1,1),
                                w_inanimate.alive = c(-1,-1,2,0,0,0,0),
@@ -684,14 +678,145 @@ contrasts(d1$pairCat) <- cbind(between.within = c(0,0,0,1,1,1,1),
                                b_i_t_human.animal = c(0,0,0,0,1,-1,0))
 contrasts(d1$pairCat)
 
+# CHOOSE ONE!
+# # ...dummy coding
+# contrasts(d1$predicate) <- cbind(hunger = c(1,0,0),
+#                                  thinking = c(0,0,1))
+
+# ...effect coding
+contrasts(d1$predicate) <- cbind(effHunger = c(1,-1,0),
+                                 effThinking = c(0,-1,1))
+
+# # ...contrast coding
+# contrasts(d1$predicate) <- cbind(lin = c(-1,0,1),
+#                                  quad = c(-1,2,-1))
+
+# --- MODELS ------------------------------------------------------------------
+
+# silliness
+
+# ... by predicate, age
+silliness0 <- glmer(sillinessCat ~ predicate + (1 | subid), data = d1, family = "binomial")
+summary(silliness0)
+
+silliness1 <- glmer(sillinessCat ~ predicate + scale(ageCalc, scale = F) + (1 | subid), data = d1, family = "binomial")
+summary(silliness1) 
+
+silliness2 <- glmer(sillinessCat ~ predicate * scale(ageCalc, scale = F) + (1 | subid), data = d1, family = "binomial")
+summary(silliness2)
+
+anova(silliness0, silliness1, silliness2)
+
+# ... by predicate, pairCat
+
 silliness3 <- glmer(sillinessCat ~ pairCat + (1 | subid), data = d1, family = "binomial")
 summary(silliness3)
 
 # silliness4 <- glmer(sillinessCat ~ pairCat + predicate + (1 | subid), data = d1, family = "binomial")
 # summary(silliness4) # failed to converge
-# 
+
 # silliness5 <- glmer(sillinessCat ~ pairCat * predicate + (1 | subid), data = d1, family = "binomial")
 # summary(silliness5) # failed to converge
-# 
+
 # anova(silliness3, silliness4, silliness5)
+
+# by predicate, trialNum
+
+silliness6 <- glmer(sillinessCat ~ predicate + poly(trialNum, 1) + (1 |subid), data = d1, family = "binomial")
+summary(silliness6)
+
+silliness7 <- glmer(sillinessCat ~ predicate * poly(trialNum, 1) + (1 |subid), data = d1, family = "binomial")
+summary(silliness7)
+
+silliness8 <- glmer(sillinessCat ~ predicate * poly(trialNum, 2) + (1 |subid), data = d1, family = "binomial")
+summary(silliness8)
+
+# silliness9 <- glmer(sillinessCat ~ predicate * poly(trialNum, 2) + scale(ageCalc, scale = F) + (1 |subid), data = d1, family = "binomial")
+# summary(silliness9) # failed to converge
+
+# silliness10 <- glmer(sillinessCat ~ predicate * poly(trialNum, 2) * scale(ageCalc, scale = F) + (1 |subid), data = d1, family = "binomial")
+# summary(silliness10) # failed to converge
+
+anova(silliness0, silliness6, silliness7, silliness8)
+
+# sarcasm
+
+# ... by predicate, age
+sarcasm0 <- glmer(sarcasmCat ~ predicate + (1 | subid), data = d1, family = "binomial")
+summary(sarcasm0)
+
+# sarcasm1 <- glmer(sarcasmCat ~ predicate + ageCalc + (1 | subid), data = d1, family = "binomial")
+# summary(sarcasm1) # failed to converge 
+
+# sarcasm2 <- glmer(sarcasmCat ~ predicate * ageCalc + (1 | subid), data = d1, family = "binomial")
+# summary(sarcasm2) # failed to converge
+
+# anova(sarcasm0, sarcasm1, sarcasm2)
+# anova(sarcasm0, sarcasm2)
+
+# ... by predicate, pairCat
+
+# sarcasm3 <- glmer(sarcasmCat ~ pairCat + (1 | subid), data = d1, family = "binomial")
+# summary(sarcasm3) # failed to converge
+# 
+# sarcasm4 <- glmer(sarcasmCat ~ pairCat + predicate + (1 | subid), data = d1, family = "binomial")
+# summary(sarcasm4) # failed to converge
+# 
+# sarcasm5 <- glmer(sarcasmCat ~ pairCat * predicate + (1 | subid), data = d1, family = "binomial")
+# summary(sarcasm5) # failed to converge
+# 
+# anova(sarcasm3, sarcasm4, sarcasm5)
+
+# by predicate, trialNum
+
+sarcasm6 <- glmer(sarcasmCat ~ predicate + poly(trialNum, 1) + (1 |subid), data = d1, family = "binomial")
+summary(sarcasm6)
+
+sarcasm7 <- glmer(sarcasmCat ~ predicate * poly(trialNum, 1) + (1 |subid), data = d1, family = "binomial")
+summary(sarcasm7)
+
+# sarcasm8 <- glmer(sarcasmCat ~ predicate * poly(trialNum, 2) + (1 |subid), data = d1, family = "binomial")
+# summary(sarcasm8) # failed to converge
+
+anova(sarcasm0, sarcasm6, sarcasm7, sarcasm8)
+
+# humor
+
+# ... by predicate, age
+humor0 <- glmer(humorCat ~ predicate + (1 | subid), data = d1, family = "binomial")
+summary(humor0)
+
+humor1 <- glmer(humorCat ~ predicate + ageCalc + (1 | subid), data = d1, family = "binomial")
+summary(humor1)
+
+humor2 <- glmer(humorCat ~ predicate * ageCalc + (1 | subid), data = d1, family = "binomial")
+summary(humor2)
+
+anova(humor0, humor1, humor2)
+
+# ... by predicate, pairCat
+
+humor3 <- glmer(humorCat ~ pairCat + (1 | subid), data = d1, family = "binomial")
+summary(humor3)
+
+humor4 <- glmer(humorCat ~ pairCat + predicate + (1 | subid), data = d1, family = "binomial")
+summary(humor4) # failed to converge
+
+humor5 <- glmer(humorCat ~ pairCat * predicate + (1 | subid), data = d1, family = "binomial")
+summary(humor5) # failed to converge
+
+anova(humor3, humor4, humor5)
+
+# by predicate, trialNum
+
+humor6 <- glmer(humorCat ~ predicate + poly(trialNum, 1) + (1 |subid), data = d1, family = "binomial")
+summary(humor6)
+
+humor7 <- glmer(humorCat ~ predicate * poly(trialNum, 1) + (1 |subid), data = d1, family = "binomial")
+summary(humor7)
+
+humor8 <- glmer(humorCat ~ predicate * poly(trialNum, 2) + (1 |subid), data = d1, family = "binomial")
+summary(humor8) # failed to converge
+
+anova(humor0, humor6, humor7, humor8)
 
