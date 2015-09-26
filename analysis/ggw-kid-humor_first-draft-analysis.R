@@ -638,31 +638,38 @@ twoWayBoot
 
 # by particpiant
 # ... by ageCalc & predicate
-qplot(x = ageCalc, y = proportion, data = participantTab) + 
+qplot(x = ageCalc, y = proportion, data = participantTab %>% filter(humorType != "humor")) + 
   geom_smooth() +
   facet_wrap(humorType ~ predicate)
 
 # overall
 # ... by predicate alone
-qplot(x = predicate, y = mean, data = predicateBoot, geom = "bar", stat = "identity") + 
+qplot(x = predicate, y = mean, data = predicateBoot %>% filter(humorType != "humor"), geom = "bar", stat = "identity") + 
   facet_wrap(~ humorType) + 
-  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1)) +
+  theme(text = element_text(size = 40)) +
+  xlab("\npredicate") +
+  ylab("proportion of trials\n")
 
 # ... by pairCat alone
-qplot(x = pairCat, y = mean, data = pairCatBoot, geom = "bar", stat = "identity") + 
+qplot(x = pairCat, y = mean, data = pairCatBoot %>% filter(humorType != "humor"), geom = "bar", stat = "identity") + 
   facet_wrap(~ humorType) + 
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
 
 # ... by predicate and pairCat
-qplot(x = pairCat, y = mean, data = twoWayBoot, geom = "bar", stat = "identity") + 
-  facet_wrap(predicate ~ humorType) + 
+qplot(x = pairCat, y = mean, data = twoWayBoot %>% filter(humorType != "humor"), geom = "bar", stat = "identity") + 
+  facet_grid(humorType ~ predicate) + 
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
 
 # ... by predicate and trialNum
 # ... silliness
 qplot(x = trialNum, y = silliness, data = d1, geom = "point", position = "jitter") + 
   facet_wrap(~ predicate) + 
-  geom_smooth()
+  geom_smooth() +
+  theme(text = element_text(size = 40)) +
+  xlab("\ntrial number") +
+  ylab("silliness\n")
+
 # ... sarcasm
 qplot(x = trialNum, y = sarcasm, data = d1, geom = "point", position = "jitter") + 
   facet_wrap(~ predicate) + 
@@ -819,4 +826,3 @@ humor8 <- glmer(humorCat ~ predicate * poly(trialNum, 2) + (1 |subid), data = d1
 summary(humor8) # failed to converge
 
 anova(humor0, humor6, humor7, humor8)
-
