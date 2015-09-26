@@ -659,40 +659,39 @@ qplot(x = pairCat, y = mean, data = twoWayBoot, geom = "bar", stat = "identity")
 
 # --- MODELS ------------------------------------------------------------------
 
-# # glmer
-# rm0 <- glmer(propJoke ~ ageCalc + (1 | subid), data = d2, family = "binomial",
-#           weights = nTrials)
-# summary(rm0)
-# 
-# rm1 <- glmer(humorCat ~ ageCalc + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-# summary(rm1)
-# 
-# rm2 <- glmer(humorCat ~ predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-# summary(rm2)
-# 
-# rm3 <- glmer(humorCat ~ ageCalc + predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-# summary(rm3)
-# 
-# rm4 <- glmer(humorCat ~ ageCalc * predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-# summary(rm4)
-# 
-# anova(rm1, rm3, rm4)
-# anova(rm2, rm3, rm4)
-# 
-# rm5 <- glmer(humorCat ~ pairCat + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-# summary(rm5)
-# 
-# rm6 <- glmer(humorCat ~ pairCat * predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-# summary(rm6)
-# 
-# 
-# 
+# silliness
 
+# ... by predicate, age
+silliness0 <- glmer(sillinessCat ~ predicate + (1 | subid), data = d1, family = "binomial")
+summary(silliness0)
 
-# predict <- predict(r)
+silliness1 <- glmer(sillinessCat ~ predicate + ageCalc + (1 | subid), data = d1, family = "binomial")
+summary(silliness1)
+
+# silliness2 <- glmer(sillinessCat ~ predicate * ageCalc + (1 | subid), data = d1, family = "binomial")
+# summary(silliness2) # failed to converge
+
+# anova(silliness0, silliness1, silliness2)
+anova(silliness0, silliness1)
+
+# ... by predicate, pairCat
+
+contrasts(d1$pairCat) <- cbind(between.within = c(0,0,0,1,1,1,1),
+                               w_inanimate.alive = c(-1,-1,2,0,0,0,0),
+                               w_animal.human = c(-1,1,0,0,0,0),
+                               b_inanimate.alive = c(0,0,0,-3,1,1,1),
+                               b_i_control.tech = c(0,0,0,0,-1,-1,2),
+                               b_i_t_human.animal = c(0,0,0,0,1,-1,0))
+contrasts(d1$pairCat)
+
+silliness3 <- glmer(sillinessCat ~ pairCat + (1 | subid), data = d1, family = "binomial")
+summary(silliness3)
+
+# silliness4 <- glmer(sillinessCat ~ pairCat + predicate + (1 | subid), data = d1, family = "binomial")
+# summary(silliness4) # failed to converge
 # 
-# d3 <- d2 %>%
-#   cbind(predict) %>%
-#   mutate(logOdds = logit(propJoke))
+# silliness5 <- glmer(sillinessCat ~ pairCat * predicate + (1 | subid), data = d1, family = "binomial")
+# summary(silliness5) # failed to converge
 # 
-# qplot(x = ageCalc, y = predict, data = d3)
+# anova(silliness3, silliness4, silliness5)
+
