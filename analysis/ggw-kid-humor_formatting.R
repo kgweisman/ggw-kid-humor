@@ -77,9 +77,9 @@ d_tidy = d_kid_run_01_raw %>%
                                   ifelse(response == "much more right", 2, NA))))),
     experimenter = factor(experimenter),
     testingSite = factor(testingSite),
-    sillinessCat = factor(ifelse(silliness > 0, "yes", "no")),
-    sarcasmCat = factor(ifelse(sarcasm > 0, "yes", "no")),
-    humorCat = factor(ifelse(silliness > 0 | sarcasm > 0, "yes", "no"))
+    sillinessCat = factor(ifelse(silliness > 0, TRUE, FALSE)),
+    sarcasmCat = factor(ifelse(sarcasm > 0, TRUE, FALSE)),
+    humorCat = factor(ifelse(silliness > 0 | sarcasm > 0, TRUE, FALSE))
     ) %>%
   select(-dateOfBirth, -dateOfTest)
 
