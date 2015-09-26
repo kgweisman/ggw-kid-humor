@@ -6,13 +6,14 @@
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(scatterplot3d)
+# library(scatterplot3d)
 library(lme4)
-library(psych)
+# library(psych)
 # library(stats)
-library(scales)
-library(smacof)
-library(eba)
+# library(scales)
+# library(smacof)
+# library(eba)
+library(langcog)
 
 # clear environment
 rm(list=ls())
@@ -32,6 +33,18 @@ dd <- dd %>%
   mutate(ageCut = factor(cut(ageCalc, breaks = 2, labels = c("young", "old"))))
 
 # --------> FILTERING ---------------------------------------------------------
+
+# --------------->-> by no video/co--------------------------------------------
+
+dd_coded = dd %>%
+  filter(is.na(silliness) == F & is.na(sarcasm) == F)
+
+dd_uncoded = dd %>%
+  filter(is.na(silliness) == T | is.na(sarcasm) == T)
+
+# set group of interest
+# ... to coded:
+dd <- dd_coded
 
 # --------------->-> by ethnicity ---------------------------------------------
 
@@ -468,69 +481,212 @@ d1 = dd %>%
                                      "human.animal",
                                      "human.tech",
                                      "animal.tech",
-                                     "control")))
+                                     "control")),
+         pairCatScore = ifelse(is.na(pairCat), NA,
+                               ifelse(pairCat == "control", 3,
+                                      ifelse(pairCat == "human.tech" |
+                                               pairCat == "animal.tech",
+                                             2,
+                                             ifelse(pairCat == "human.animal", 1,
+                                                    0)))))
 
 # --- MAKE PROPORTIONS DATAFRAME ----------------------------------------------
 
+# by participant, by predicate
+
 nTrials <- d1 %>%
-  group_by(subid) %>%
+  group_by(subid, ageCalc, predicate) %>%
   summarise(nTrials = length(subid))
 
-d2 <- d1 %>%
-  count(subid, ageCalc, humorCat) %>%
-  left_join(nTrials) %>%
-  mutate(propJoke = n/nTrials) %>%
-  filter(humorCat != "no") %>%
-  select(-humorCat)
+sillinessTab <- d1 %>%
+  count(subid, ageCalc, predicate, sillinessCat) %>%
+  full_join(nTrials) %>%
+  mutate(propSilliness = n/nTrials) %>%
+  filter(sillinessCat != FALSE) %>%
+  select(-sillinessCat, -n)
 
-# --- PLOT JOKING -------------------------------------------------------------
+sarcasmTab <- d1 %>%
+  count(subid, ageCalc, predicate, sarcasmCat) %>%
+  full_join(nTrials) %>%
+  mutate(propSarcasm = n/nTrials) %>%
+  filter(sarcasmCat != FALSE) %>%
+  select(-sarcasmCat, -n)
 
-# ... by ageCalc, predicate
+humorTab <- d1 %>%
+  count(subid, ageCalc, predicate, humorCat) %>%
+  full_join(nTrials) %>%
+  mutate(propHumor = n/nTrials) %>%
+  filter(humorCat != FALSE) %>%
+  select(-humorCat, -n)
 
-qplot(x = ageCalc, y = humorCat, data = subset(d1, humorCat != "NA"), position = "jitter") +
-  geom_smooth(method = "glm", family = "binomial")
+participantTab <- full_join(nTrials, sillinessTab) %>%
+  full_join(sarcasmTab) %>%
+  full_join(humorTab) %>%
+  mutate(silliness = ifelse(is.na(propSilliness), 0, propSilliness),
+         sarcasm = ifelse(is.na(propSarcasm), 0, propSarcasm),
+         humor = ifelse(is.na(propHumor), 0, propHumor)) %>%
+  select(-propSilliness, -propSarcasm, -propHumor) %>%
+  gather(humorType, proportion, -subid, -ageCalc, -predicate, -nTrials) %>%
+  arrange(subid, humorType, predicate)
 
-qplot(x = ageCalc, y = propJoke, data = d2)
+participantTab
 
-qplot(predicate, data = subset(d1, humorCat != "NA"), 
-      geom = "bar", fill = relevel(humorCat, ref = "yes"))
+# bootstrap by predicate
 
-qplot(predicate, data = subset(d1, humorCat != "NA"), 
-      geom = "bar", fill = relevel(humorCat, ref = "yes")) +
-  facet_grid(~ageCut)
+sillinessPredicateBoot <- multi_boot(data = d1,
+                            summary_function = "mean",
+                            column = "sillinessCat",
+                            summary_groups = "predicate",
+                            statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                            statistics_groups = "predicate") %>%
+  mutate(humorType = "silliness")
 
-qplot(predicate, data = subset(d1, humorCat != "NA"), 
-      geom = "bar", fill = relevel(humorCat, ref = "yes")) +
-  facet_grid(~pairCat)
+sarcasmPredicateBoot <- multi_boot(data = d1,
+                            summary_function = "mean",
+                            column = "sarcasmCat",
+                            summary_groups = "predicate",
+                            statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                            statistics_groups = "predicate") %>%
+  mutate(humorType = "sarcasm")
 
-# glmer
-rm0 <- glmer(propJoke ~ ageCalc + (1 | subid), data = d2, family = "binomial",
-          weights = nTrials)
-summary(rm0)
+humorPredicateBoot <- multi_boot(data = d1,
+                          summary_function = "mean",
+                          column = "humorCat",
+                          summary_groups = "predicate",
+                          statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                          statistics_groups = "predicate") %>%
+  mutate(humorType = "humor")
 
-rm1 <- glmer(humorCat ~ ageCalc + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-summary(rm1)
+predicateBoot <- full_join(sillinessPredicateBoot, sarcasmPredicateBoot) %>%
+  full_join(humorPredicateBoot) %>%
+  mutate(humorType = factor(humorType)) %>%
+  select(predicate, humorType, ci_lower:ci_upper) %>%
+  arrange(humorType, predicate)
 
-rm2 <- glmer(humorCat ~ predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-summary(rm2)
+predicateBoot
 
-rm3 <- glmer(humorCat ~ ageCalc + predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-summary(rm3)
+# bootstrap by pairCat
 
-rm4 <- glmer(humorCat ~ ageCalc * predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-summary(rm4)
+sillinessPairCatBoot <- multi_boot(data = d1,
+                                     summary_function = "mean",
+                                     column = "sillinessCat",
+                                     summary_groups = "pairCat",
+                                     statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                                     statistics_groups = "pairCat") %>%
+  mutate(humorType = "silliness")
 
-anova(rm1, rm3, rm4)
-anova(rm2, rm3, rm4)
+sarcasmPairCatBoot <- multi_boot(data = d1,
+                                   summary_function = "mean",
+                                   column = "sarcasmCat",
+                                   summary_groups = "pairCat",
+                                   statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                                   statistics_groups = "pairCat") %>%
+  mutate(humorType = "sarcasm")
 
-rm5 <- glmer(humorCat ~ pairCat + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-summary(rm5)
+humorPairCatBoot <- multi_boot(data = d1,
+                                 summary_function = "mean",
+                                 column = "humorCat",
+                                 summary_groups = "pairCat",
+                                 statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                                 statistics_groups = "pairCat") %>%
+  mutate(humorType = "humor")
 
-rm6 <- glmer(humorCat ~ pairCat * predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
-summary(rm6)
+pairCatBoot <- full_join(sillinessPairCatBoot, sarcasmPairCatBoot) %>%
+  full_join(humorPairCatBoot) %>%
+  mutate(humorType = factor(humorType)) %>%
+  select(pairCat, humorType, ci_lower:ci_upper) %>%
+  arrange(humorType, pairCat)
 
+pairCatBoot
 
+# bootstrap by predicate and pairCat
 
+sillinessTwoWayBoot <- multi_boot(data = d1,
+                                   summary_function = "mean",
+                                   column = "sillinessCat",
+                                   summary_groups = c("predicate", "pairCat"),
+                                   statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                                   statistics_groups = c("predicate", "pairCat")) %>%
+  mutate(humorType = "silliness")
+
+sarcasmTwoWayBoot <- multi_boot(data = d1,
+                                 summary_function = "mean",
+                                 column = "sarcasmCat",
+                                 summary_groups = c("predicate", "pairCat"),
+                                 statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                                 statistics_groups = c("predicate", "pairCat")) %>%
+  mutate(humorType = "sarcasm")
+
+humorTwoWayBoot <- multi_boot(data = d1,
+                               summary_function = "mean",
+                               column = "humorCat",
+                               summary_groups = c("predicate", "pairCat"),
+                               statistics_functions = c("ci_lower", "mean", "ci_upper"),
+                               statistics_groups = c("predicate", "pairCat")) %>%
+  mutate(humorType = "humor")
+
+twoWayBoot <- full_join(sillinessTwoWayBoot, sarcasmTwoWayBoot) %>%
+  full_join(humorTwoWayBoot) %>%
+  mutate(humorType = factor(humorType)) %>%
+  select(pairCat, humorType, ci_lower:ci_upper) %>%
+  arrange(humorType, pairCat)
+
+twoWayBoot
+
+# --- PLOTS -------------------------------------------------------------------
+
+# by particpiant
+# ... by ageCalc & predicate
+qplot(x = ageCalc, y = proportion, data = participantTab) + 
+  geom_smooth() +
+  facet_wrap(humorType ~ predicate)
+
+# overall
+# ... by predicate alone
+qplot(x = predicate, y = mean, data = predicateBoot, geom = "bar", stat = "identity") + 
+  facet_wrap(~ humorType) + 
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
+
+# ... by pairCat alone
+qplot(x = pairCat, y = mean, data = pairCatBoot, geom = "bar", stat = "identity") + 
+  facet_wrap(~ humorType) + 
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
+
+# ... by predicate and pairCat
+qplot(x = pairCat, y = mean, data = twoWayBoot, geom = "bar", stat = "identity") + 
+  facet_wrap(predicate ~ humorType) + 
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper, width = .1))
+
+# --- MODELS ------------------------------------------------------------------
+
+# # glmer
+# rm0 <- glmer(propJoke ~ ageCalc + (1 | subid), data = d2, family = "binomial",
+#           weights = nTrials)
+# summary(rm0)
+# 
+# rm1 <- glmer(humorCat ~ ageCalc + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
+# summary(rm1)
+# 
+# rm2 <- glmer(humorCat ~ predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
+# summary(rm2)
+# 
+# rm3 <- glmer(humorCat ~ ageCalc + predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
+# summary(rm3)
+# 
+# rm4 <- glmer(humorCat ~ ageCalc * predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
+# summary(rm4)
+# 
+# anova(rm1, rm3, rm4)
+# anova(rm2, rm3, rm4)
+# 
+# rm5 <- glmer(humorCat ~ pairCat + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
+# summary(rm5)
+# 
+# rm6 <- glmer(humorCat ~ pairCat * predicate + (1 | subid), data = subset(d1, ageCalc != "NA"), family = "binomial")
+# summary(rm6)
+# 
+# 
+# 
 
 
 # predict <- predict(r)
